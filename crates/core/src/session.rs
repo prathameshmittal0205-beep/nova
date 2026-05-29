@@ -60,8 +60,7 @@ impl Session {
 
 // ── Nova Tauri GUI Workspace Session ──────────────────────────────────────────
 
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
+use sha2::{Sha256, Digest};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -114,10 +113,11 @@ impl WorkspaceSession {
     }
 
     fn session_path(workspace_path: &str) -> PathBuf {
-        let mut hasher = DefaultHasher::new();
-        workspace_path.hash(&mut hasher);
-        let hash = hasher.finish();
-        Self::session_dir().join(format!("{:016x}.json", hash))
+        let mut hasher = Sha256::new();
+        hasher.update(workspace_path.as_bytes());
+        let hash = hasher.finalize();
+        let hash_hex = format!("{:x}", hash);
+        Self::session_dir().join(format!("{}.json", hash_hex))
     }
 
     pub fn save(&self) -> Result<()> {

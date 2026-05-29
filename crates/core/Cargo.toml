@@ -11,3 +11,4 @@ serde_json = { workspace = true }
 ropey     = { workspace = true }
 toml      = { workspace = true }
 dirs      = { workspace = true }
+sha2      = { workspace = true }
