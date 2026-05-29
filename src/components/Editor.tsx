@@ -16,7 +16,7 @@ import { lintKeymap } from "@codemirror/lint";
 import { getTheme } from "../theme/themes";
 import { vimLite, VimMode } from "../extensions/vimLite";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
-import { useStore, tabContentMap, FileTab } from "../store";
+import { useStore, tabContentMap, FileTab, cursorPositions } from "../store";
 import { invoke } from "@tauri-apps/api/core";
 
 // ── Compartments — one per reconfigurable axis ────────────────────────────────
@@ -191,6 +191,7 @@ export function Editor({ tab }: EditorProps) {
               const head = update.state.selection.main.head;
               const line = update.state.doc.lineAt(head);
               useStore.getState().setCursor(line.number, head - line.from + 1);
+              cursorPositions.set(tabPathRef.current, { line: line.number, col: head - line.from + 1 });
             }
             if (!update.docChanged) return;
             const content = update.state.doc.toString();
@@ -209,6 +210,19 @@ export function Editor({ tab }: EditorProps) {
     view.dom.dataset.vimMode = "normal";
     viewRef.current = view;
     view.focus();
+
+    // Restore cursor position
+    const pos = cursorPositions.get(tab.path);
+    if (pos) {
+      try {
+        const line = view.state.doc.line(Math.min(pos.line, view.state.doc.lines));
+        const head = Math.min(line.from + pos.col - 1, line.to);
+        view.dispatch({ selection: { anchor: head, head } });
+        view.dispatch({ effects: EditorView.scrollIntoView(head, { y: "center" }) });
+      } catch (e) {
+        // Line might be out of bounds if file changed
+      }
+    }
 
     // Load language parser without blocking the editor opening
     loadLanguage(tab.language).then((ext) => {

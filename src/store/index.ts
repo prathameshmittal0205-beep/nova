@@ -101,6 +101,8 @@ export interface FileTab {
   language:    string;
   kind?:       "file" | "ai" | "ai-launcher" | "pinned-terminal" | "html-viewer" | "pdf-viewer" | "md-preview" | "notebook-viewer";
   aiProvider?: AiProvider;
+  cursorLine?: number;
+  cursorCol?:  number;
 }
 
 /** @deprecated Use AI_TAB_PREFIX + openAiTab instead */
@@ -108,6 +110,9 @@ export const CLAUDE_TAB_PATH    = "__claude__";
 export const AI_TAB_PREFIX      = "__ai__";
 export const AI_LAUNCHER_PATH   = "__ai-launcher__";
 export const MD_PREVIEW_PREFIX  = "__md-preview__";
+
+// Mutable map to track cursor positions without React re-renders
+export const cursorPositions = new Map<string, { line: number; col: number }>();
 
 // ── PaneState — each pane has its own independent tab list ───────────────────
 export interface PaneState {
@@ -145,6 +150,12 @@ interface AppState {
   workspaceRoot:    string;
   setWorkspaceRoot: (root: string) => void;
   initCwd:          (root: string) => void;
+
+  hydrateSession:   (session: any) => void;
+  restoredTerminals: any[] | null;
+  setRestoredTerminals: (t: any[] | null) => void;
+  terminals: any[];
+  setTerminals: (t: any[]) => void;
 
   // ── Two-pane model ───────────────────────────────────────────────────────
   leftPane:     PaneState;
@@ -313,6 +324,33 @@ export const useStore = create<AppState>((set, get) => ({
     // Only fall back to process cwd if no workspace was saved
     if (!get().workspaceRoot) set({ workspaceRoot: root });
   },
+
+  hydrateSession: (session) => {
+    const { leftPane, rightPane, focusedPane, terminals } = session;
+    
+    // Restore cursor positions to the mutable map
+    const restoreCursors = (pane: PaneState | null) => {
+      pane?.tabs.forEach(t => {
+        if (t.cursorLine && t.cursorCol) {
+          cursorPositions.set(t.path, { line: t.cursorLine, col: t.cursorCol });
+        }
+      });
+    };
+    restoreCursors(leftPane);
+    restoreCursors(rightPane);
+
+    set({
+      leftPane: leftPane ?? { tabs: [], activeIdx: 0 },
+      rightPane: rightPane ?? null,
+      focusedPane: focusedPane === "right" ? "right" : "left",
+      restoredTerminals: terminals ?? null,
+    });
+  },
+
+  restoredTerminals: null,
+  setRestoredTerminals: (t) => set({ restoredTerminals: t }),
+  terminals: [],
+  setTerminals: (t) => set({ terminals: t }),
 
   // ── Two-pane model ────────────────────────────────────────────────────
   leftPane:    { tabs: [], activeIdx: 0 },
@@ -925,3 +963,42 @@ export const useStore = create<AppState>((set, get) => ({
     loadPreset(next);
   },
 }));
+
+// ── Session Sync ─────────────────────────────────────────────────────────────
+let sessionSaveTimer: ReturnType<typeof setTimeout> | null = null;
+useStore.subscribe((state, prevState) => {
+  if (
+    state.leftPane !== prevState.leftPane ||
+    state.rightPane !== prevState.rightPane ||
+    state.focusedPane !== prevState.focusedPane ||
+    state.terminals !== prevState.terminals
+  ) {
+    if (sessionSaveTimer) clearTimeout(sessionSaveTimer);
+    sessionSaveTimer = setTimeout(() => {
+      // Don't save if there's no workspace
+      if (!state.workspaceRoot) return;
+      
+      const mapTab = (t: FileTab) => {
+        const pos = cursorPositions.get(t.path);
+        if (pos) {
+          return { ...t, cursorLine: pos.line, cursorCol: pos.col };
+        }
+        return t;
+      };
+
+      const payload = {
+        version: 1,
+        workspacePath: state.workspaceRoot,
+        lastUpdated: 0,
+        leftPane: { ...state.leftPane, tabs: state.leftPane.tabs.map(mapTab) },
+        rightPane: state.rightPane ? { ...state.rightPane, tabs: state.rightPane.tabs.map(mapTab) } : null,
+        focusedPane: state.focusedPane,
+        terminals: state.terminals,
+      };
+      
+      invoke("save_workspace_session", { session: payload }).catch(e => {
+        console.error("Failed to save session", e);
+      });
+    }, 2000);
+  }
+});

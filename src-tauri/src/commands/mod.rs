@@ -6,3 +6,4 @@ pub mod jupyter;
 pub mod pty;
 pub mod spotify;
 pub mod updater;
+pub mod session;

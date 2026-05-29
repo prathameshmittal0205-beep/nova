@@ -298,6 +298,9 @@ pub fn run() {
             updater::get_app_version,
             updater::check_update,
             updater::install_update,
+            // Session
+            commands::session::load_workspace_session,
+            commands::session::save_workspace_session,
         ])
         .run(tauri::generate_context!())
         .expect("error running nova");

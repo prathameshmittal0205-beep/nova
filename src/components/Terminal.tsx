@@ -527,6 +527,9 @@ export function Terminal({ visible }: TerminalProps) {
   const updateSettings    = useStore((s) => s.updateSettings);
   const themeName         = useStore((s) => s.settings.editor.theme);
   const setTerminalHeight = useStore((s) => s.setTerminalHeight);
+  const setTerminals      = useStore((s) => s.setTerminals);
+  const restoredTerminals = useStore((s) => s.restoredTerminals);
+  const setRestoredTerminals = useStore((s) => s.setRestoredTerminals);
 
   const [shells,       setShells]       = useState<string[]>([]);
   const [sessions,     setSessions]     = useState<Session[]>([]);
@@ -581,6 +584,15 @@ export function Terminal({ visible }: TerminalProps) {
   // removeSession resets it to false when the last session is deleted.
   const hasCreatedInitial = useRef(false);
   useEffect(() => {
+    // If we have restored terminals, inject them now and clear them from store
+    if (restoredTerminals && restoredTerminals.length > 0 && shells.length > 0) {
+      hasCreatedInitial.current = true;
+      setSessions(restoredTerminals);
+      setMainActiveId(restoredTerminals[0].id);
+      setRestoredTerminals(null);
+      return;
+    }
+
     if (hasCreatedInitial.current || shells.length === 0 || sessionsRef.current.length > 0 || !visible) return;
     hasCreatedInitial.current = true;
     const id = crypto.randomUUID();
@@ -588,7 +600,12 @@ export function Terminal({ visible }: TerminalProps) {
     setSessions([s]);
     setMainActiveId(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shells, visible]);
+  }, [shells, visible, restoredTerminals, setRestoredTerminals]);
+
+  // Sync sessions to store so they can be saved
+  useEffect(() => {
+    setTerminals(sessions);
+  }, [sessions, setTerminals]);
 
   const makeSession = useCallback((shell?: string): Session => ({
     id:       crypto.randomUUID(),

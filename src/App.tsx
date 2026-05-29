@@ -63,6 +63,7 @@ export default function App() {
 
   const setWorkspaceRoot  = useStore((s) => s.setWorkspaceRoot);
   const initCwd           = useStore((s) => s.initCwd);
+  const hydrateSession    = useStore((s) => s.hydrateSession);
   const toggleFileTree    = useStore((s) => s.toggleFileTree);
   const toggleTerminal    = useStore((s) => s.toggleTerminal);
   const toggleGitPanel    = useStore((s) => s.toggleGitPanel);
@@ -111,6 +112,15 @@ export default function App() {
       .then((path) => { if (path) setWorkspaceRoot(path); })
       .catch(() => {});
   }, [setWorkspaceRoot]);
+
+  // Load session state
+  useEffect(() => {
+    if (workspaceRoot) {
+      invoke<any>("load_workspace_session", { workspacePath: workspaceRoot })
+        .then((session) => hydrateSession(session))
+        .catch(() => {});
+    }
+  }, [workspaceRoot, hydrateSession]);
 
   const openFileDialog = async () => {
     try {
