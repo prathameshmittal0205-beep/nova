@@ -331,7 +331,7 @@ export const useStore = create<AppState>((set, get) => ({
     // Restore cursor positions to the mutable map
     const restoreCursors = (pane: PaneState | null) => {
       pane?.tabs.forEach(t => {
-        if (t.cursorLine && t.cursorCol) {
+        if (t.cursorLine != null && t.cursorCol != null) {
           cursorPositions.set(t.path, { line: t.cursorLine, col: t.cursorCol });
         }
       });
