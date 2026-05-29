@@ -344,6 +344,7 @@ export const useStore = create<AppState>((set, get) => ({
       rightPane: rightPane ?? null,
       focusedPane: focusedPane === "right" ? "right" : "left",
       restoredTerminals: terminals ?? null,
+      terminals: terminals ?? [],
     });
   },
 
@@ -971,7 +972,9 @@ useStore.subscribe((state, prevState) => {
     state.leftPane !== prevState.leftPane ||
     state.rightPane !== prevState.rightPane ||
     state.focusedPane !== prevState.focusedPane ||
-    state.terminals !== prevState.terminals
+    state.terminals !== prevState.terminals ||
+    state.cursorLine !== prevState.cursorLine ||
+    state.cursorCol !== prevState.cursorCol
   ) {
     if (sessionSaveTimer) clearTimeout(sessionSaveTimer);
     sessionSaveTimer = setTimeout(() => {
